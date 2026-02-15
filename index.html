@@ -244,9 +244,31 @@ function parseCSV(text) {
 function extractWords(phrases) {
   const counts = {};
   phrases.forEach(p => {
-    p.toLowerCase().replace(/[^a-zA-Z0-9\s'-]/g, " ").split(/[\s,;/]+/)
-      .filter(w => w.length > 1 && !STOP.has(w))
-      .forEach(w => { counts[w] = (counts[w] || 0) + 1; });
+    // Split on commas, semicolons, slashes — these are intentional separators
+    const chunks = p.toLowerCase().replace(/[^a-zA-Z0-9\s',;/-]/g, " ")
+      .split(/[,;/]+/)
+      .map(c => c.trim())
+      .filter(c => c.length > 0);
+
+    chunks.forEach(chunk => {
+      const words = chunk.split(/\s+/).filter(w => w.length > 1);
+      if (words.length === 0) return;
+
+      if (words.length <= 3) {
+        // Short phrase — keep it together, just remove leading/trailing stop words
+        let start = 0, end = words.length - 1;
+        while (start <= end && STOP.has(words[start])) start++;
+        while (end >= start && STOP.has(words[end])) end--;
+        if (start <= end) {
+          const phrase = words.slice(start, end + 1).join(" ");
+          if (phrase.length > 1) counts[phrase] = (counts[phrase] || 0) + 1;
+        }
+      } else {
+        // Longer text — split into individual words, remove stop words
+        words.filter(w => !STOP.has(w))
+          .forEach(w => { counts[w] = (counts[w] || 0) + 1; });
+      }
+    });
   });
   return Object.entries(counts)
     .map(([text, count]) => ({ text, count }))
