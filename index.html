@@ -142,113 +142,10 @@
   }
 
   .update-time { color: #334155; font-size: 12px; }
-
-  /* Config overlay */
-  .config-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.85);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    backdrop-filter: blur(8px);
-  }
-
-  .config-box {
-    background: #111827;
-    border: 1px solid #1e293b;
-    border-radius: 16px;
-    padding: 40px;
-    max-width: 560px;
-    width: 90%;
-  }
-
-  .config-box h2 {
-    font-size: 24px;
-    font-weight: 800;
-    margin-bottom: 8px;
-  }
-
-  .config-box p {
-    color: #64748b;
-    font-size: 14px;
-    line-height: 1.5;
-    margin-bottom: 24px;
-  }
-
-  .config-box label {
-    display: block;
-    color: #94a3b8;
-    font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .config-box input[type="text"] {
-    width: 100%;
-    padding: 12px 16px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid #334155;
-    border-radius: 10px;
-    color: #e2e8f0;
-    font-size: 14px;
-    font-family: 'DM Sans', monospace;
-    outline: none;
-    margin-bottom: 20px;
-  }
-
-  .config-box input:focus { border-color: #3b82f6; }
-
-  .config-box button {
-    width: 100%;
-    padding: 14px;
-    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-    border: none;
-    border-radius: 12px;
-    color: #fff;
-    font-size: 16px;
-    font-weight: 700;
-    cursor: pointer;
-    letter-spacing: 0.02em;
-  }
-
-  .config-box button:hover { opacity: 0.9; }
-
-  .config-box .hint {
-    color: #475569;
-    font-size: 12px;
-    margin-top: 8px;
-    line-height: 1.4;
-  }
-
-  .config-box .prefilled {
-    color: #34d399;
-    font-size: 13px;
-    margin-bottom: 16px;
-  }
 </style>
 </head>
 <body>
 
-<!-- Config Screen -->
-<div class="config-overlay" id="configOverlay">
-  <div class="config-box">
-    <h2>Live Word Cloud Setup</h2>
-    <p>Paste your published Google Sheet CSV URL below. This is the URL you get from Google Sheets → File → Share → Publish to web → CSV format.</p>
-    <label>Google Sheet CSV URL</label>
-    <input type="text" id="csvUrlInput" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv" />
-    <div class="prefilled" id="prefilledNote" style="display:none">Pre-filled with your saved URL</div>
-    <button onclick="startDisplay()">Launch Word Cloud</button>
-    <div class="hint">
-      The sheet should have 3 columns: Timestamp, "What excites you about AI?", "What concerns you about AI?" — the standard Google Forms output.
-    </div>
-  </div>
-</div>
-
-<!-- Main Display -->
 <header>
   <div>
     <h1>What Does AI Mean to You?</h1>
@@ -289,25 +186,10 @@
 <footer>Scan the QR code at check-in to add your voice · Refreshes every 5 seconds</footer>
 
 <script>
-// ─── Config ───
-const DEFAULT_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS8GJeEOixfH9o-LuXEE8SAN0BbnrNVMqhZIGveFLsMQL9G7QRcxDSYhvcra8kndJbgujfXxSsXfMoi/pub?gid=1638596277&single=true&output=csv";
-let CSV_URL = "";
+// ─── Hardcoded Config ───
+const SHEET_ID = "1tPsgI_H442gUM88_ly2VROAw2Tq1SIGapJG1N9UQZYE";
+const SHEET_GID = "1638596277";
 const POLL_MS = 5000;
-
-// Pre-fill input
-const input = document.getElementById("csvUrlInput");
-input.value = DEFAULT_CSV_URL;
-document.getElementById("prefilledNote").style.display = "block";
-
-function startDisplay() {
-  const url = input.value.trim();
-  if (!url) return;
-  CSV_URL = url;
-  document.getElementById("configOverlay").style.display = "none";
-  fetchAndRender();
-  setInterval(fetchAndRender, POLL_MS);
-  window.addEventListener("resize", renderClouds);
-}
 
 // ─── Stop words ───
 const STOP = new Set([
@@ -319,6 +201,12 @@ const STOP = new Set([
   "would","should","may","might","all","some","many","much","really",
   "think","things","thing","lot","lots","way","make","get","know"
 ]);
+
+// ─── Google Visualization API (returns fresh data every request) ───
+function buildGvizUrl() {
+  return "https://docs.google.com/spreadsheets/d/" + SHEET_ID +
+    "/gviz/tq?tqx=out:csv&gid=" + SHEET_GID;
+}
 
 // ─── CSV Parsing ───
 function parseCSVRow(line) {
@@ -374,19 +262,19 @@ async function fetchAndRender() {
   const txt = document.getElementById("statusText");
   const time = document.getElementById("updateTime");
   try {
-    const res = await fetch(CSV_URL + (CSV_URL.includes("?") ? "&" : "?") + "t=" + Date.now());
+    const res = await fetch(buildGvizUrl());
     if (!res.ok) throw new Error("HTTP " + res.status);
     const csv = await res.text();
     currentData = parseCSV(csv);
     const count = Math.max(currentData.excites.length, currentData.concerns.length);
     dot.className = "status-dot live";
-    txt.textContent = "Live · " + count + " response" + (count !== 1 ? "s" : "");
+    txt.textContent = "Live \u00b7 " + count + " response" + (count !== 1 ? "s" : "");
     time.textContent = "Updated " + new Date().toLocaleTimeString();
     renderClouds();
   } catch (e) {
     console.error("Fetch error:", e);
     dot.className = "status-dot error";
-    txt.textContent = "Connection error — retrying...";
+    txt.textContent = "Error \u2014 check Sheet sharing settings & retry";
   }
 }
 
@@ -462,6 +350,11 @@ function renderClouds() {
   renderCloud("excitesCanvas", "excitesWaiting", extractWords(currentData.excites), GREEN);
   renderCloud("concernsCanvas", "concernsWaiting", extractWords(currentData.concerns), ORANGE);
 }
+
+// ─── Auto-start ───
+fetchAndRender();
+setInterval(fetchAndRender, POLL_MS);
+window.addEventListener("resize", renderClouds);
 </script>
 </body>
 </html>
